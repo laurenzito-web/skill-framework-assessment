@@ -26,8 +26,12 @@ const ONET_API_VERSION = 'v1.9';
 // Requires OpenAI API key to be set (see evaluateOpenEndedResponse function)
 const AI_EVALUATION_ENABLED = false; // Set to true to enable AI evaluation
 // Set to true to enable AI-based question generation when sections need more questions
-const AI_QUESTION_GENERATION_ENABLED = false; // Set to true to enable AI question generation
-const OPENAI_API_KEY = ''; // Add your OpenAI API key here, or set via environment variable
+const AI_QUESTION_GENERATION_ENABLED = true; // Set to true to enable AI question generation
+// API key is loaded from config.local.js (if it exists) or can be set here
+// Check for local config first, then fallback to empty string
+const OPENAI_API_KEY = (typeof LOCAL_OPENAI_API_KEY !== 'undefined' && LOCAL_OPENAI_API_KEY) 
+    ? LOCAL_OPENAI_API_KEY 
+    : ''; // Add your OpenAI API key here, or use config.local.js (recommended)
 const OPENAI_MODEL = 'gpt-4o-mini'; // Use 'gpt-4o-mini' for cost-effective evaluation or 'gpt-4' for more accurate
 
 // DOM Elements
@@ -2740,40 +2744,101 @@ Return ONLY the JSON array, no other text.`;
 
 // Map a question to a detailed skill (competency) within a category based on skill name
 function mapQuestionToDetailedSkill(question, categoryCompetencies) {
-    if (!question.skillName || categoryCompetencies.length === 0) {
+    if (categoryCompetencies.length === 0) {
         return null;
     }
     
-    const skillNameLower = question.skillName.toLowerCase();
+    // If no skillName, try to extract from categoryDisplay
+    let skillNameLower = (question.skillName || '').toLowerCase();
+    if (!skillNameLower && question.categoryDisplay) {
+        // Extract skill name from categoryDisplay (format: "Category - Skill Name")
+        const parts = question.categoryDisplay.split(' - ');
+        if (parts.length > 1) {
+            skillNameLower = parts[parts.length - 1].toLowerCase();
+        }
+    }
+    
+    // Also check scenario and question text for keywords
+    const scenarioText = (question.scenario || '').toLowerCase();
+    const questionText = (question.question || '').toLowerCase();
+    const allText = `${skillNameLower} ${scenarioText} ${questionText}`;
+    
     let bestMatch = null;
     let bestMatchScore = 0;
     
     categoryCompetencies.forEach(competency => {
         let matchScore = 0;
         
-        // Check if skill name matches competency keywords
-        if (competency.representativeSkills) {
-            competency.representativeSkills.forEach(repSkill => {
-                const repSkillLower = repSkill.toLowerCase();
-                if (skillNameLower.includes(repSkillLower) || repSkillLower.includes(skillNameLower)) {
-                    matchScore += 10; // High score for direct skill match
+        const competencyNameLower = competency.name.toLowerCase();
+        const competencyDescLower = (competency.description || '').toLowerCase();
+        
+        // 1. Direct skill name match (highest priority)
+        if (skillNameLower) {
+            // Check if skill name matches competency keywords
+            if (competency.representativeSkills) {
+                competency.representativeSkills.forEach(repSkill => {
+                    const repSkillLower = repSkill.toLowerCase();
+                    if (skillNameLower.includes(repSkillLower) || repSkillLower.includes(skillNameLower)) {
+                        matchScore += 20; // High score for direct skill match
+                    }
+                });
+            }
+            
+            // Check if skill name contains key words from competency name
+            const competencyKeywords = competencyNameLower.split(/\s+/).filter(w => w.length > 3);
+            competencyKeywords.forEach(keyword => {
+                if (skillNameLower.includes(keyword)) {
+                    matchScore += 15;
                 }
             });
         }
         
-        // Check competency name and description for keyword matches
-        const competencyNameLower = competency.name.toLowerCase();
-        const competencyDescLower = (competency.description || '').toLowerCase();
+        // 2. Check categoryDisplay for competency name
+        if (question.categoryDisplay) {
+            const categoryDisplayLower = question.categoryDisplay.toLowerCase();
+            if (categoryDisplayLower.includes(competencyNameLower)) {
+                matchScore += 15;
+            }
+        }
         
-        // Check for keyword matches in competency name/description
-        const skillKeywords = skillNameLower.split(/\s+/);
-        skillKeywords.forEach(keyword => {
-            if (keyword.length > 3) { // Only match meaningful words
-                if (competencyNameLower.includes(keyword) || competencyDescLower.includes(keyword)) {
-                    matchScore += 5;
-                }
+        // 3. Check scenario and question text for competency keywords
+        const competencyKeywords = [
+            ...competencyNameLower.split(/\s+/).filter(w => w.length > 3),
+            ...competencyDescLower.split(/\s+/).filter(w => w.length > 3)
+        ];
+        
+        competencyKeywords.forEach(keyword => {
+            if (allText.includes(keyword)) {
+                matchScore += 3;
             }
         });
+        
+        // 4. Check for common professional terms in competency description
+        const commonTerms = {
+            'assessment': ['assess', 'evaluate', 'monitor', 'observe'],
+            'intervention': ['intervene', 'treat', 'care', 'manage'],
+            'safety': ['safety', 'risk', 'prevent', 'protect'],
+            'communication': ['communicate', 'inform', 'educate', 'explain'],
+            'coordination': ['coordinate', 'collaborate', 'team', 'work'],
+            'decision': ['decide', 'judgment', 'analyze', 'reason'],
+            'quality': ['quality', 'improve', 'standard', 'excellence'],
+            'professional': ['professional', 'ethical', 'accountable', 'responsible']
+        };
+        
+        Object.keys(commonTerms).forEach(term => {
+            if (competencyNameLower.includes(term) || competencyDescLower.includes(term)) {
+                commonTerms[term].forEach(synonym => {
+                    if (allText.includes(synonym)) {
+                        matchScore += 5;
+                    }
+                });
+            }
+        });
+        
+        // 5. Category match bonus (if question category matches)
+        if (question.category === competency.category) {
+            matchScore += 2;
+        }
         
         if (matchScore > bestMatchScore) {
             bestMatchScore = matchScore;
@@ -2781,7 +2846,8 @@ function mapQuestionToDetailedSkill(question, categoryCompetencies) {
         }
     });
     
-    return bestMatch && bestMatchScore > 0 ? bestMatch : null;
+    // Lower threshold - accept matches with score >= 3 (was > 0, but that's too strict)
+    return bestMatch && bestMatchScore >= 3 ? bestMatch : null;
 }
 
 // Organize questions into sections, one per competency category
@@ -2902,8 +2968,32 @@ async function organizeQuestionsIntoBatches() {
                 questionsBySkill[skillName].push(question);
             } else {
                 unmappedQuestions.push(question);
+                // Log why question didn't match for debugging
+                console.log(`Question ${question.id} didn't match any competency. skillName: "${question.skillName}", categoryDisplay: "${question.categoryDisplay}"`);
             }
         });
+        
+        // If we have unmapped questions, try to distribute them more intelligently
+        if (unmappedQuestions.length > 0) {
+            console.log(`Category "${category}" has ${unmappedQuestions.length} unmapped questions. Attempting intelligent distribution...`);
+            
+            // Distribute unmapped questions to competencies that have fewer questions
+            const competencyQuestionCounts = categoryCompetencies.map(c => ({
+                competency: c,
+                count: questionsBySkill[c.name]?.length || 0
+            })).sort((a, b) => a.count - b.count);
+            
+            unmappedQuestions.forEach((question, index) => {
+                // Round-robin distribution to competencies with fewest questions
+                const targetCompetency = competencyQuestionCounts[index % competencyQuestionCounts.length].competency;
+                const skillName = targetCompetency.name;
+                if (!questionsBySkill[skillName]) {
+                    questionsBySkill[skillName] = [];
+                }
+                questionsBySkill[skillName].push(question);
+                console.log(`Assigned unmapped question ${question.id} to competency "${skillName}"`);
+            });
+        }
         
         // Ensure each detailed skill has at least one question
         const sectionQuestions = [];

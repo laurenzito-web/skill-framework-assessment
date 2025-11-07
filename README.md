@@ -144,6 +144,31 @@ The application now supports AI-based evaluation of open-ended responses using O
 - Setting up a backend proxy to handle API calls
 - Using a secrets management service
 
+### Setting Up Your OpenAI API Key
+
+1. **Get an API Key**:
+   - Go to https://platform.openai.com/
+   - Sign up or log in to your account
+   - Navigate to API Keys section: https://platform.openai.com/api-keys
+   - Click "Create new secret key"
+   - Copy the key (you won't be able to see it again!)
+
+2. **Add the Key to Your Code**:
+   - Open `script.js`
+   - Find line 30: `const OPENAI_API_KEY = '';`
+   - Replace the empty string with your key: `const OPENAI_API_KEY = 'sk-...';`
+
+3. **Alternative: Use Environment Variables** (Recommended for production):
+   - For local development, you can use a `.env` file (make sure it's in `.gitignore`)
+   - The code will check for `process.env.OPENAI_API_KEY` as a fallback
+   - For production, set the environment variable on your hosting platform
+
+4. **Enable the Features**:
+   - Set `AI_EVALUATION_ENABLED = true` (line 27) to enable AI response evaluation
+   - Set `AI_QUESTION_GENERATION_ENABLED = true` (line 29) to enable AI question generation
+
+**Note**: The API key is used client-side in this implementation. For production, consider using a backend proxy to keep your key secure.
+
 ### O*NET API Configuration
 
 To use the O*NET API directly, you may need to:

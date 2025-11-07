@@ -111,6 +111,39 @@ Example:
 
 If O*NET API is unavailable, the app uses fallback questions. Edit the `generateFallbackQuestions()` function in `script.js` to customize these for specific roles.
 
+## AI-Based Response Evaluation
+
+The application now supports AI-based evaluation of open-ended responses using OpenAI's API. This provides more accurate and nuanced scoring compared to the keyword-based fallback method.
+
+### Enabling AI Evaluation
+
+1. **Get an OpenAI API Key**
+   - Sign up at https://platform.openai.com/
+   - Create an API key in your account settings
+
+2. **Configure the Application**
+   - Open `script.js`
+   - Find the AI Evaluation Configuration section (around line 24-29)
+   - Set `AI_EVALUATION_ENABLED = true`
+   - Add your API key: `const OPENAI_API_KEY = 'your-api-key-here';`
+
+3. **Choose a Model**
+   - `gpt-4o-mini` (default): Cost-effective, good accuracy
+   - `gpt-4`: Higher accuracy, more expensive
+
+### How It Works
+
+- **AI Evaluation**: When enabled, responses are sent to OpenAI with the scenario, question, response, and rubric. The AI returns a score (1, 2, or 3).
+- **Fallback**: If AI evaluation fails or is disabled, the system uses keyword-based matching.
+- **Usage**: AI evaluation is used when users click "Evaluate Response" on individual questions. Batch feedback uses keyword evaluation for performance.
+
+### Security Note
+
+⚠️ **Important**: Never commit your API key to version control. Consider:
+- Using environment variables
+- Setting up a backend proxy to handle API calls
+- Using a secrets management service
+
 ### O*NET API Configuration
 
 To use the O*NET API directly, you may need to:

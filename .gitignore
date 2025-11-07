@@ -22,3 +22,9 @@ npm-debug.log*
 *.tmp
 *.temp
 
+# API keys and secrets
+.env
+.env.local
+*.key
+config.local.js
+

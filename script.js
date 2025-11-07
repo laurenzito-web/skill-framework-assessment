@@ -21,6 +21,13 @@ let batchAnswers = {}; // Answers for current batch
 const ONET_API_BASE = 'https://services.onetcenter.org/ws/online/';
 const ONET_API_VERSION = 'v1.9';
 
+// AI Evaluation Configuration
+// Set to true to enable AI-based response evaluation
+// Requires OpenAI API key to be set (see evaluateOpenEndedResponse function)
+const AI_EVALUATION_ENABLED = false; // Set to true to enable AI evaluation
+const OPENAI_API_KEY = ''; // Add your OpenAI API key here, or set via environment variable
+const OPENAI_MODEL = 'gpt-4o-mini'; // Use 'gpt-4o-mini' for cost-effective evaluation or 'gpt-4' for more accurate
+
 // DOM Elements
 const welcomeScreen = document.getElementById('welcome-screen');
 const roleSelectionScreen = document.getElementById('role-selection-screen');
@@ -132,12 +139,16 @@ if (submitBatchBtn) {
 if (nextBatchBtn) {
     nextBatchBtn.addEventListener('click', () => {
     if (currentBatchIndex < questionBatches.length - 1) {
+        // Hide feedback screen and clear its content
+        batchFeedbackScreen.classList.remove('active');
+        batchFeedbackSummary.innerHTML = '';
         currentBatchIndex++;
         showBatchIntro(currentBatchIndex);
     } else {
         // All batches complete, show final results
         calculateScores();
         batchFeedbackScreen.classList.remove('active');
+        batchFeedbackSummary.innerHTML = '';
         resultsScreen.classList.add('active');
         displayResults();
     }
@@ -150,6 +161,7 @@ if (viewFinalResultsBtn) {
     viewFinalResultsBtn.addEventListener('click', () => {
         calculateScores();
         batchFeedbackScreen.classList.remove('active');
+        batchFeedbackSummary.innerHTML = '';
         resultsScreen.classList.add('active');
         displayResults();
     });
@@ -2557,7 +2569,7 @@ function generateQuestionsFromSkills(skills, occupation) {
     });
     
     // Generate scenario questions for each category
-    // Generate at least one question per skill, and at least 5 questions per category
+    // Generate at least one question per skill, and at least 3 questions per category
     Object.keys(skillsByCategory).forEach(category => {
         const categorySkills = skillsByCategory[category]
             .sort((a, b) => (b.importance || 0) - (a.importance || 0));
@@ -2586,9 +2598,9 @@ function generateQuestionsFromSkills(skills, occupation) {
             }
         });
         
-        // Then, generate additional questions to reach at least 5 per category
+        // Then, generate additional questions to reach at least 3 per category
         // Distribute these across skills, prioritizing high-importance skills
-        const minQuestionsPerCategory = Math.max(5, categorySkills.length);
+        const minQuestionsPerCategory = Math.max(3, categorySkills.length);
         const currentCount = questionsPerSkill.size;
         
         if (currentCount < minQuestionsPerCategory) {
@@ -2807,7 +2819,7 @@ function organizeQuestionsIntoBatches() {
         // If no questions were mapped to skills, use all questions for this category
         if (sectionQuestions.length === 0 && categoryQuestions.length > 0) {
             console.warn(`No questions mapped to detailed skills in category "${category}". Using all questions for this category.`);
-            sectionQuestions.push(...categoryQuestions.slice(0, Math.max(5, categoryCompetencies.length)));
+            sectionQuestions.push(...categoryQuestions.slice(0, Math.max(3, categoryCompetencies.length)));
             sectionQuestions.forEach(q => usedQuestionIds.add(q.id));
         }
         
@@ -2827,8 +2839,8 @@ function organizeQuestionsIntoBatches() {
             ...categoryQuestions.filter(q => !usedQuestionIds.has(q.id))
         ];
         
-        // Distribute remaining questions, ensuring we have at least 5 total per section
-        const targetQuestionsPerSection = Math.max(5, categoryCompetencies.length);
+        // Distribute remaining questions, ensuring we have at least 3 total per section
+        const targetQuestionsPerSection = Math.max(3, categoryCompetencies.length);
         while (sectionQuestions.length < targetQuestionsPerSection && remainingQuestions.length > 0) {
             // Find the skill with the fewest questions
             const skillsByCount = categoryCompetencies
@@ -2870,8 +2882,21 @@ function organizeQuestionsIntoBatches() {
             sectionQuestions.push(...additionalQuestions);
         }
         
-        // Create section for this category (always create if we have questions)
-        if (sectionQuestions.length > 0) {
+        // If we still don't have enough questions, try to get more from other categories
+        if (sectionQuestions.length < 3) {
+            const stillNeeded = 3 - sectionQuestions.length;
+            // Look for unused questions from any category
+            const unusedQuestions = allQuestions.filter(q => !usedQuestionIds.has(q.id));
+            if (unusedQuestions.length > 0) {
+                const additionalQuestions = unusedQuestions.slice(0, stillNeeded);
+                sectionQuestions.push(...additionalQuestions);
+                additionalQuestions.forEach(q => usedQuestionIds.add(q.id));
+                console.log(`Supplemented category "${category}" with ${additionalQuestions.length} questions from other categories to reach minimum of 3`);
+            }
+        }
+        
+        // Create section for this category only if we have at least 3 questions
+        if (sectionQuestions.length >= 3) {
             // Get the list of detailed skills covered in this section
             const coveredSkills = new Set();
             sectionQuestions.forEach(q => {
@@ -2897,7 +2922,7 @@ function organizeQuestionsIntoBatches() {
             
             console.log(`Created section for category "${category}" with ${sectionQuestions.length} questions covering ${finalCompetencies.length} detailed skills`);
         } else {
-            console.warn(`No questions available for category "${category}" - skipping section creation`);
+            console.warn(`Category "${category}" only has ${sectionQuestions.length} questions (minimum 3 required) - skipping section creation`);
         }
     });
     
@@ -2922,7 +2947,7 @@ function organizeQuestionsIntoBatches() {
                 category: firstCategory,
                 categoryDisplay: firstCategory,
                 competency: null,
-                questions: questions.slice(0, Math.max(5, questions.length)),
+                questions: questions.slice(0, Math.max(3, questions.length)),
                 competencies: fallbackCompetencies.map(c => c.name),
                 categoryCompetencies: fallbackCompetencies
             });
@@ -3098,19 +3123,6 @@ function showAllBatchQuestions() {
         responseContainer.appendChild(textarea);
         questionDiv.appendChild(responseContainer);
         
-        // O*NET skills guidance (if available)
-        if (question.onetSkills && question.onetSkills.length > 0) {
-            const guidanceDiv = document.createElement('div');
-            guidanceDiv.className = 'onet-skills-guidance';
-            const guidanceTitle = document.createElement('strong');
-            guidanceTitle.textContent = 'Relevant O*NET Skills: ';
-            guidanceDiv.appendChild(guidanceTitle);
-            
-            const skillsList = question.onetSkills.map(s => `${s.name} (${s.importance}/5)`).join(', ');
-            guidanceDiv.appendChild(document.createTextNode(skillsList));
-            questionDiv.appendChild(guidanceDiv);
-        }
-        
         questionContainer.appendChild(questionDiv);
     });
     
@@ -3174,13 +3186,23 @@ function showBatchFeedback() {
         
         // Evaluate response and show feedback
         const response = batchAnswers[question.id] || '';
-        const score = evaluateOpenEndedResponse(question, response);
+        // Note: evaluateOpenEndedResponse is async, but we'll evaluate synchronously here
+        // In batch feedback, we evaluate all at once, so we use the keyword method directly
+        const score = evaluateWithKeywords(question, response);
         // evaluateOpenEndedResponse stores feedback in global questionFeedback object
         const evaluation = questionFeedback[question.id] || null;
         
         const feedbackLevel = document.createElement('div');
         feedbackLevel.className = `feedback-level feedback-level-${score}`;
-        feedbackLevel.textContent = `Level ${score}/3: ${getLevelLabel(score)}`;
+        
+        // Add evaluation method indicator (batch feedback uses keyword method)
+        const evaluationMethod = evaluation?.evaluationMethod || 'Keyword';
+        const model = evaluation?.model || '';
+        const methodText = evaluationMethod === 'AI' 
+            ? ` 🤖 AI${model ? ` (${model})` : ''}`
+            : ' 📝 Keyword';
+        
+        feedbackLevel.textContent = `Level ${score}/3: ${getLevelLabel(score)}${methodText}`;
         questionFeedbackDiv.appendChild(feedbackLevel);
         
         const feedbackText = document.createElement('div');
@@ -3624,7 +3646,7 @@ let questionFeedback = {};
 function generateFallbackQuestions(occupation) {
     const occupationCode = occupation.code;
     
-    // Role-specific scenario questions - ensure at least 5 questions per category
+    // Role-specific scenario questions - ensure at least 3 questions per category
     const fallbackQuestions = {
         "29-1141.00": [ // Registered Nurses
             {
@@ -4034,11 +4056,27 @@ function showQuestion(index) {
         evaluateBtn.style.marginTop = '15px';
         evaluateBtn.disabled = true;
         
-        evaluateBtn.addEventListener('click', () => {
+        evaluateBtn.addEventListener('click', async () => {
             const responseText = textArea.value.trim();
             if (responseText.length >= 10) {
-                const score = evaluateOpenEndedResponse(question, responseText);
-                showFeedback(question, score, questionDiv);
+                evaluateBtn.disabled = true;
+                // Show evaluation method in button text
+                const evaluationText = AI_EVALUATION_ENABLED && OPENAI_API_KEY 
+                    ? `Evaluating with AI...` 
+                    : `Evaluating...`;
+                evaluateBtn.textContent = evaluationText;
+                try {
+                    const score = await evaluateOpenEndedResponse(question, responseText);
+                    showFeedback(question, score, questionDiv);
+                } catch (error) {
+                    console.error('Error evaluating response:', error);
+                    // Fallback to keyword evaluation
+                    const score = evaluateWithKeywords(question, responseText);
+                    showFeedback(question, score, questionDiv);
+                } finally {
+                    evaluateBtn.disabled = false;
+                    evaluateBtn.textContent = 'Evaluate Response';
+                }
             }
         });
         
@@ -4162,10 +4200,18 @@ function showFeedback(question, rubricLevel, container = null) {
     const rubric = RUBRIC_LEVELS[rubricLevel];
     if (!rubric) return;
     
+    // Check if this evaluation used AI
+    const evaluation = questionFeedback[question.id];
+    const evaluationMethod = evaluation?.evaluationMethod || 'Keyword';
+    const model = evaluation?.model || '';
+    const methodBadge = evaluationMethod === 'AI' 
+        ? `<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; margin-left: 10px;">🤖 AI Evaluated${model ? ` (${model})` : ''}</span>`
+        : `<span style="background: #6b7280; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; margin-left: 10px;">📝 Keyword Match</span>`;
+    
     const feedbackBox = document.createElement('div');
     feedbackBox.className = 'feedback-box';
     feedbackBox.innerHTML = `
-        <h4>Feedback</h4>
+        <h4>Feedback ${methodBadge}</h4>
         <div class="feedback-level feedback-level-${rubricLevel}">
             <strong>${rubric.label}</strong>
         </div>
@@ -4176,13 +4222,15 @@ function showFeedback(question, rubricLevel, container = null) {
     
     targetContainer.appendChild(feedbackBox);
     
-    // Store feedback for results
+    // Store feedback for results (preserve existing evaluation method if available)
     questionFeedback[question.id] = {
         level: rubricLevel,
         label: rubric.label,
         description: rubric.description,
         rubric: question.rubric ? question.rubric[rubricLevel] : null,
-        feedback: rubric.feedback
+        feedback: rubric.feedback,
+        evaluationMethod: evaluation?.evaluationMethod || 'Keyword',
+        model: evaluation?.model || ''
     };
 }
 
@@ -4246,10 +4294,10 @@ function calculateScores() {
             let normalizedScore;
             
             if (q.responseType === 'open-ended' || (q.type === 'scenario' && QUESTION_TYPE_CONFIG.responseType === 'open-ended')) {
-                // For open-ended responses, we'll need to evaluate them
-                // For now, we'll use a placeholder score that can be updated with actual evaluation
-                // In a real system, this would use AI or manual evaluation
-                normalizedScore = evaluateOpenEndedResponse(q, answer);
+                // For open-ended responses, evaluate them
+                // Note: This is called synchronously in calculateScores, so we use keyword evaluation
+                // AI evaluation would require making calculateScores async, which affects the UI flow
+                normalizedScore = evaluateWithKeywords(q, answer);
             } else if (q.type === 'rating') {
                 normalizedScore = Math.round((answer / 5) * 4);
                 if (normalizedScore === 0) normalizedScore = 1;
@@ -4262,12 +4310,151 @@ function calculateScores() {
     });
 }
 
-// Evaluate open-ended response (basic keyword matching - can be enhanced with AI)
-function evaluateOpenEndedResponse(question, responseText) {
+// Evaluate open-ended response using AI (if enabled) or keyword matching (fallback)
+async function evaluateOpenEndedResponse(question, responseText) {
+    // Try AI evaluation if enabled and API key is available
+    if (AI_EVALUATION_ENABLED) {
+        const apiKey = OPENAI_API_KEY || (typeof process !== 'undefined' && process.env?.OPENAI_API_KEY);
+        if (apiKey) {
+            try {
+                console.log(`🤖 Using AI evaluation (${OPENAI_MODEL}) for question ${question.id}`);
+                const aiScore = await evaluateWithAI(question, responseText, apiKey);
+                if (aiScore !== null) {
+                    console.log(`✅ AI evaluation complete: Score ${aiScore}/3 (${RUBRIC_LEVELS[aiScore].label})`);
+                    // Store evaluation for feedback with expanded rubric information
+                    const rubricLevel = RUBRIC_LEVELS[aiScore];
+                    questionFeedback[question.id] = {
+                        level: aiScore,
+                        label: rubricLevel.label,
+                        description: rubricLevel.description,
+                        rubric: question.rubric ? question.rubric[aiScore] : null,
+                        feedback: rubricLevel.feedback,
+                        responseText: responseText,
+                        indicators: rubricLevel.indicators || [],
+                        recommendations: rubricLevel.recommendations || [],
+                        nextSteps: rubricLevel.nextSteps || '',
+                        examples: rubricLevel.examples || [],
+                        evaluationMethod: 'AI', // Track that AI was used
+                        model: OPENAI_MODEL
+                    };
+                    return aiScore;
+                }
+            } catch (error) {
+                console.warn('⚠️ AI evaluation failed, falling back to keyword matching:', error);
+                // Fall through to keyword matching
+            }
+        } else {
+            console.log('ℹ️ AI evaluation enabled but no API key found, using keyword matching');
+        }
+    } else {
+        console.log('ℹ️ AI evaluation disabled, using keyword matching');
+    }
+    
+    // Fallback to keyword-based evaluation
+    console.log(`📝 Using keyword-based evaluation for question ${question.id}`);
+    const keywordScore = evaluateWithKeywords(question, responseText);
+    console.log(`✅ Keyword evaluation complete: Score ${keywordScore}/3 (${RUBRIC_LEVELS[keywordScore].label})`);
+    return keywordScore;
+}
+
+// AI-based evaluation using OpenAI API
+async function evaluateWithAI(question, responseText, apiKey) {
+    try {
+        // Build the evaluation prompt
+        const rubricLevel1 = RUBRIC_LEVELS[1];
+        const rubricLevel2 = RUBRIC_LEVELS[2];
+        const rubricLevel3 = RUBRIC_LEVELS[3];
+        
+        const prompt = `You are evaluating a professional response to a scenario-based assessment question. 
+
+SCENARIO:
+${question.scenario || 'N/A'}
+
+QUESTION:
+${question.question}
+
+RESPONSE TO EVALUATE:
+${responseText}
+
+EVALUATION RUBRIC:
+
+Level 1 - Not Competent:
+Description: ${rubricLevel1.description}
+Key Indicators: ${rubricLevel1.indicators.join('; ')}
+Examples: ${rubricLevel1.examples.join('; ')}
+
+Level 2 - Approaching Competency:
+Description: ${rubricLevel2.description}
+Key Indicators: ${rubricLevel2.indicators.join('; ')}
+Examples: ${rubricLevel2.examples.join('; ')}
+
+Level 3 - Competent:
+Description: ${rubricLevel3.description}
+Key Indicators: ${rubricLevel3.indicators.join('; ')}
+Examples: ${rubricLevel3.examples.join('; ')}
+
+${question.rubricCriteria ? `ADDITIONAL CRITERIA:
+Level 3: ${question.rubricCriteria.level4 || question.rubricCriteria.level3 || ''}
+Level 2: ${question.rubricCriteria.level2 || ''}
+Level 1: ${question.rubricCriteria.level1 || ''}` : ''}
+
+TASK:
+Evaluate the response and assign a score of 1, 2, or 3 based on the rubric above.
+- Score 1 = Not Competent
+- Score 2 = Approaching Competency  
+- Score 3 = Competent
+
+Respond with ONLY a single number (1, 2, or 3) and nothing else.`;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: OPENAI_MODEL,
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are an expert evaluator of professional competency assessments. You evaluate responses based on provided rubrics and return only a numeric score (1, 2, or 3).'
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.3, // Lower temperature for more consistent scoring
+                max_tokens: 10 // Only need a single number
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const scoreText = data.choices[0]?.message?.content?.trim();
+        const score = parseInt(scoreText, 10);
+
+        // Validate score is between 1 and 3
+        if (score >= 1 && score <= 3) {
+            return score;
+        } else {
+            console.warn(`AI returned invalid score: ${scoreText}, falling back to keyword matching`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error in AI evaluation:', error);
+        return null;
+    }
+}
+
+// Keyword-based evaluation (fallback method)
+function evaluateWithKeywords(question, responseText) {
     const text = responseText.toLowerCase();
     
     // Basic evaluation based on keywords and length
-    // This is a simple heuristic - in production, you'd use AI or manual evaluation
     let score = 1;
     
     if (question.rubricCriteria) {
@@ -4309,7 +4496,8 @@ function evaluateOpenEndedResponse(question, responseText) {
         indicators: rubricLevel.indicators || [],
         recommendations: rubricLevel.recommendations || [],
         nextSteps: rubricLevel.nextSteps || '',
-        examples: rubricLevel.examples || []
+        examples: rubricLevel.examples || [],
+        evaluationMethod: 'Keyword' // Track that keyword matching was used
     };
     
     return score;

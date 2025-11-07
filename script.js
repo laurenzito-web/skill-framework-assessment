@@ -21,10 +21,12 @@ let batchAnswers = {}; // Answers for current batch
 const ONET_API_BASE = 'https://services.onetcenter.org/ws/online/';
 const ONET_API_VERSION = 'v1.9';
 
-// AI Evaluation Configuration
+// AI Configuration
 // Set to true to enable AI-based response evaluation
 // Requires OpenAI API key to be set (see evaluateOpenEndedResponse function)
 const AI_EVALUATION_ENABLED = false; // Set to true to enable AI evaluation
+// Set to true to enable AI-based question generation when sections need more questions
+const AI_QUESTION_GENERATION_ENABLED = false; // Set to true to enable AI question generation
 const OPENAI_API_KEY = ''; // Add your OpenAI API key here, or set via environment variable
 const OPENAI_MODEL = 'gpt-4o-mini'; // Use 'gpt-4o-mini' for cost-effective evaluation or 'gpt-4' for more accurate
 
@@ -97,7 +99,7 @@ backToRolesBtn.addEventListener('click', () => {
     roleSelectionScreen.classList.add('active');
 });
 
-startAssessmentBtn.addEventListener('click', () => {
+startAssessmentBtn.addEventListener('click', async () => {
     console.log('Start Assessment button clicked');
     console.log('Questions available:', questions.length);
     
@@ -107,7 +109,7 @@ startAssessmentBtn.addEventListener('click', () => {
     }
     
     competenciesScreen.classList.remove('active');
-    organizeQuestionsIntoBatches();
+    await organizeQuestionsIntoBatches();
     
     if (questionBatches.length === 0) {
         alert('Error: Could not organize questions. Please try again.');
@@ -2632,6 +2634,110 @@ function generateQuestionsFromSkills(skills, occupation) {
     return generatedQuestions;
 }
 
+// Generate questions using AI when sections need more questions
+async function generateAIQuestions(category, categoryCompetencies, count, occupation) {
+    if (!AI_QUESTION_GENERATION_ENABLED || !OPENAI_API_KEY) {
+        return null;
+    }
+    
+    try {
+        const apiKey = OPENAI_API_KEY;
+        const occupationTitle = occupation?.title || 'the role';
+        
+        // Build list of competencies/skills for this category
+        const competencyNames = categoryCompetencies.map(c => c.name).join(', ');
+        const competencyDescriptions = categoryCompetencies
+            .map(c => `- ${c.name}: ${c.description || ''}`)
+            .join('\n');
+        
+        const prompt = `You are creating scenario-based assessment questions for a professional competency assessment.
+
+OCCUPATION: ${occupationTitle}
+CATEGORY: ${category}
+COMPETENCIES TO ASSESS:
+${competencyDescriptions}
+
+TASK:
+Generate ${count} scenario-based question(s) that assess the competencies listed above. Each question should:
+1. Present a realistic professional scenario relevant to ${occupationTitle}
+2. Ask how the person would handle the situation
+3. Be specific to the category "${category}" and the competencies: ${competencyNames}
+4. Be appropriate for assessing professional competency
+
+For each question, provide:
+- scenario: A brief, realistic professional scenario (2-3 sentences)
+- question: A question asking how they would handle the situation (1 sentence)
+- categoryDisplay: A short description linking to the competency (e.g., "${category} - ${categoryCompetencies[0]?.name || 'Assessment'}")
+
+Return your response as a JSON array with this exact format:
+[
+  {
+    "scenario": "Scenario text here",
+    "question": "Question text here",
+    "categoryDisplay": "Category - Competency name"
+  }
+]
+
+Return ONLY the JSON array, no other text.`;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: OPENAI_MODEL,
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are an expert at creating professional competency assessment questions. You return only valid JSON arrays.'
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 1000
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content?.trim();
+        
+        // Extract JSON from response (handle cases where AI adds markdown code blocks)
+        let jsonContent = content;
+        if (content.startsWith('```')) {
+            jsonContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        }
+        
+        const questions = JSON.parse(jsonContent);
+        
+        // Convert to our question format
+        return questions.map(q => ({
+            category: category,
+            categoryDisplay: q.categoryDisplay || `${category} - ${categoryCompetencies[0]?.name || 'Assessment'}`,
+            type: 'scenario',
+            skillName: categoryCompetencies[0]?.name || category,
+            scenario: q.scenario,
+            question: q.question,
+            responseType: QUESTION_TYPE_CONFIG.responseType,
+            options: null,
+            rubric: null,
+            rubricCriteria: null,
+            onetSkills: null
+        }));
+    } catch (error) {
+        console.error('Error generating AI questions:', error);
+        return null;
+    }
+}
+
 // Map a question to a detailed skill (competency) within a category based on skill name
 function mapQuestionToDetailedSkill(question, categoryCompetencies) {
     if (!question.skillName || categoryCompetencies.length === 0) {
@@ -2680,7 +2786,7 @@ function mapQuestionToDetailedSkill(question, categoryCompetencies) {
 
 // Organize questions into sections, one per competency category
 // Each section ensures at least one question per detailed skill in that category
-function organizeQuestionsIntoBatches() {
+async function organizeQuestionsIntoBatches() {
     questionBatches = [];
     
     if (!questions || questions.length === 0) {
@@ -2773,13 +2879,13 @@ function organizeQuestionsIntoBatches() {
     
     console.log(`Total categories to process: ${categoriesWithBoth.length}`, categoriesWithBoth);
     
-    // Process each category that has both
-    categoriesWithBoth.forEach(category => {
+    // Process each category that has both (need to use for...of for async)
+    for (const category of categoriesWithBoth) {
         const categoryCompetencies = competenciesByCategory[category];
         const categoryQuestions = questionsByCategory[category] || [];
         
         if (categoryQuestions.length === 0 || categoryCompetencies.length === 0) {
-            return; // Skip if still empty
+            continue; // Skip if still empty
         }
         
         // Map questions to detailed skills within this category
@@ -2882,16 +2988,48 @@ function organizeQuestionsIntoBatches() {
             sectionQuestions.push(...additionalQuestions);
         }
         
-        // If we still don't have enough questions, try to get more from other categories
+        // If we still don't have enough questions, generate more using AI or pull from other categories
         if (sectionQuestions.length < 3) {
             const stillNeeded = 3 - sectionQuestions.length;
-            // Look for unused questions from any category
-            const unusedQuestions = allQuestions.filter(q => !usedQuestionIds.has(q.id));
-            if (unusedQuestions.length > 0) {
-                const additionalQuestions = unusedQuestions.slice(0, stillNeeded);
-                sectionQuestions.push(...additionalQuestions);
-                additionalQuestions.forEach(q => usedQuestionIds.add(q.id));
-                console.log(`Supplemented category "${category}" with ${additionalQuestions.length} questions from other categories to reach minimum of 3`);
+            
+            // Try AI generation first if enabled
+            if (AI_QUESTION_GENERATION_ENABLED && OPENAI_API_KEY) {
+                try {
+                    console.log(`🤖 Generating ${stillNeeded} AI question(s) for category "${category}"`);
+                    const aiQuestions = await generateAIQuestions(category, categoryCompetencies, stillNeeded, selectedOccupation || { title: 'Professional' });
+                    if (aiQuestions && aiQuestions.length > 0) {
+                        // Assign IDs to new questions
+                        let maxId = Math.max(...questions.map(q => q.id || 0), 0);
+                        aiQuestions.forEach(q => {
+                            q.id = ++maxId;
+                            q.category = category;
+                            sectionQuestions.push(q);
+                            usedQuestionIds.add(q.id);
+                        });
+                        console.log(`✅ Generated ${aiQuestions.length} AI question(s) for category "${category}"`);
+                    } else {
+                        throw new Error('AI generation returned no questions');
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ AI question generation failed for category "${category}", falling back to other categories:`, error);
+                    // Fall through to pulling from other categories
+                    const unusedQuestions = allQuestions.filter(q => !usedQuestionIds.has(q.id));
+                    if (unusedQuestions.length > 0) {
+                        const additionalQuestions = unusedQuestions.slice(0, stillNeeded);
+                        sectionQuestions.push(...additionalQuestions);
+                        additionalQuestions.forEach(q => usedQuestionIds.add(q.id));
+                        console.log(`Supplemented category "${category}" with ${additionalQuestions.length} questions from other categories to reach minimum of 3`);
+                    }
+                }
+            } else {
+                // Fallback: Look for unused questions from any category
+                const unusedQuestions = allQuestions.filter(q => !usedQuestionIds.has(q.id));
+                if (unusedQuestions.length > 0) {
+                    const additionalQuestions = unusedQuestions.slice(0, stillNeeded);
+                    sectionQuestions.push(...additionalQuestions);
+                    additionalQuestions.forEach(q => usedQuestionIds.add(q.id));
+                    console.log(`Supplemented category "${category}" with ${additionalQuestions.length} questions from other categories to reach minimum of 3`);
+                }
             }
         }
         
@@ -2924,7 +3062,7 @@ function organizeQuestionsIntoBatches() {
         } else {
             console.warn(`Category "${category}" only has ${sectionQuestions.length} questions (minimum 3 required) - skipping section creation`);
         }
-    });
+    }
     
     // Fallback: if no sections created, create at least one section with all questions
     if (questionBatches.length === 0) {

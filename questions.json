@@ -1,0 +1,119 @@
+[
+    {
+        "id": 1,
+        "category": "Technical Skills",
+        "type": "multiple-choice",
+        "question": "How would you rate your proficiency in programming?",
+        "options": [
+            { "text": "Beginner - I can write basic code", "value": 1 },
+            { "text": "Intermediate - I can build small applications", "value": 2 },
+            { "text": "Advanced - I can architect complex systems", "value": 3 },
+            { "text": "Expert - I can lead technical initiatives", "value": 4 }
+        ]
+    },
+    {
+        "id": 2,
+        "category": "Problem Solving",
+        "type": "rating",
+        "question": "Rate your ability to solve complex problems",
+        "scale": {
+            "min": 1,
+            "max": 5,
+            "labels": ["Novice", "Beginner", "Intermediate", "Advanced", "Expert"]
+        }
+    },
+    {
+        "id": 3,
+        "category": "Communication",
+        "type": "multiple-choice",
+        "question": "How comfortable are you with presenting ideas to a team?",
+        "options": [
+            { "text": "Very uncomfortable", "value": 1 },
+            { "text": "Somewhat uncomfortable", "value": 2 },
+            { "text": "Comfortable", "value": 3 },
+            { "text": "Very comfortable", "value": 4 }
+        ]
+    },
+    {
+        "id": 4,
+        "category": "Leadership",
+        "type": "rating",
+        "question": "Rate your leadership and team management skills",
+        "scale": {
+            "min": 1,
+            "max": 5,
+            "labels": ["Novice", "Beginner", "Intermediate", "Advanced", "Expert"]
+        }
+    },
+    {
+        "id": 5,
+        "category": "Technical Skills",
+        "type": "multiple-choice",
+        "question": "What is your experience with version control systems (Git, SVN, etc.)?",
+        "options": [
+            { "text": "No experience", "value": 1 },
+            { "text": "Basic knowledge", "value": 2 },
+            { "text": "Proficient", "value": 3 },
+            { "text": "Expert", "value": 4 }
+        ]
+    },
+    {
+        "id": 6,
+        "category": "Problem Solving",
+        "type": "multiple-choice",
+        "question": "How do you approach debugging a complex issue?",
+        "options": [
+            { "text": "I ask for help immediately", "value": 1 },
+            { "text": "I try a few things, then ask for help", "value": 2 },
+            { "text": "I systematically troubleshoot", "value": 3 },
+            { "text": "I can debug efficiently and help others", "value": 4 }
+        ]
+    },
+    {
+        "id": 7,
+        "category": "Communication",
+        "type": "rating",
+        "question": "Rate your written communication skills",
+        "scale": {
+            "min": 1,
+            "max": 5,
+            "labels": ["Novice", "Beginner", "Intermediate", "Advanced", "Expert"]
+        }
+    },
+    {
+        "id": 8,
+        "category": "Technical Skills",
+        "type": "rating",
+        "question": "Rate your knowledge of software architecture and design patterns",
+        "scale": {
+            "min": 1,
+            "max": 5,
+            "labels": ["Novice", "Beginner", "Intermediate", "Advanced", "Expert"]
+        }
+    },
+    {
+        "id": 9,
+        "category": "Leadership",
+        "type": "multiple-choice",
+        "question": "How do you handle conflicts within a team?",
+        "options": [
+            { "text": "I avoid conflicts", "value": 1 },
+            { "text": "I try to mediate when possible", "value": 2 },
+            { "text": "I address conflicts directly and constructively", "value": 3 },
+            { "text": "I proactively prevent conflicts through communication", "value": 4 }
+        ]
+    },
+    {
+        "id": 10,
+        "category": "Problem Solving",
+        "type": "multiple-choice",
+        "question": "When learning a new technology, what is your approach?",
+        "options": [
+            { "text": "I need extensive guidance", "value": 1 },
+            { "text": "I follow tutorials step-by-step", "value": 2 },
+            { "text": "I learn by doing and experimenting", "value": 3 },
+            { "text": "I quickly adapt and can teach others", "value": 4 }
+        ]
+    }
+]
+

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skills Assessment</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Skills Assessment</h1>
+            <p class="subtitle">Evaluate your skills across different areas</p>
+        </header>
+
+        <div id="welcome-screen" class="screen active">
+            <div class="welcome-content">
+                <h2>Welcome to the Skills Assessment</h2>
+                <p>This assessment will help you evaluate your skills based on your role. We'll use O*NET data to assess how well you perform the skills required for your occupation.</p>
+                <ul class="info-list">
+                    <li>✓ Role-specific skill assessment</li>
+                    <li>✓ Based on O*NET occupational data</li>
+                    <li>✓ Self-assessment ratings</li>
+                    <li>✓ Detailed results at the end</li>
+                </ul>
+                <button id="start-btn" class="btn btn-primary">Get Started</button>
+            </div>
+        </div>
+
+        <div id="role-selection-screen" class="screen">
+            <div class="role-selection-content">
+                <h2>Select Your Role</h2>
+                <p>Search for any job title or occupation. We'll use O*NET data to identify the key skills for this position.</p>
+                
+                <div class="search-container">
+                    <input type="text" id="role-search" placeholder="Search for any job title (e.g., 'Software Developer', 'Nurse', 'Teacher')..." class="search-input">
+                    <button id="search-onet-btn" class="btn btn-primary" style="margin-top: 10px;">Search O*NET</button>
+                    <p class="search-hint">Or browse from the list below</p>
+                </div>
+                
+                <div id="search-results" class="search-results" style="display: none;">
+                    <h3>Search Results</h3>
+                    <div id="search-results-list" class="role-list"></div>
+                </div>
+                
+                <div id="role-list-container">
+                    <h3>Browse Occupations</h3>
+                    <div id="role-list" class="role-list">
+                        <!-- Roles will be dynamically loaded here -->
+                    </div>
+                </div>
+                
+                <div id="loading-roles" class="loading-message" style="display: none;">
+                    <p>Loading roles from O*NET...</p>
+                </div>
+                
+                <div id="role-error" class="error-message" style="display: none;">
+                    <p>Unable to load roles. Using default occupation list.</p>
+                </div>
+                
+                <button id="back-to-welcome-btn" class="btn btn-secondary" style="margin-top: 20px;">Back</button>
+            </div>
+        </div>
+
+        <div id="competencies-screen" class="screen">
+            <div class="competencies-content">
+                <h2 id="competencies-role-title">Role Competencies</h2>
+                <p class="competencies-intro">Before you begin the assessment, review the representative competencies required to perform this role well. These competencies are based on O*NET data and will be assessed through scenario-based questions.</p>
+                <div id="competencies-list" class="competencies-list">
+                    <!-- Competencies will be dynamically loaded here -->
+                </div>
+                <div class="competencies-footer">
+                    <p class="competencies-note">You will be presented with scenarios that assess these competencies. Review the list above, then click "Start Assessment" when ready.</p>
+                    <button id="view-rubrics-btn" class="btn btn-secondary" style="margin-top: 20px;">View Rubrics for All Competencies</button>
+                    <button id="start-assessment-btn" class="btn btn-primary" style="margin-top: 15px;">Start Assessment</button>
+                    <button id="back-to-roles-btn" class="btn btn-secondary" style="margin-top: 15px;">Back to Role Selection</button>
+                </div>
+            </div>
+            
+            <!-- Rubrics Modal -->
+            <div id="rubrics-modal" class="rubrics-modal" style="display: none;">
+                <div class="rubrics-modal-content">
+                    <div class="rubrics-modal-header">
+                        <h2>Assessment Rubrics</h2>
+                        <button id="close-rubrics-btn" class="rubrics-close-btn">&times;</button>
+                    </div>
+                    <div id="rubrics-content" class="rubrics-content">
+                        <!-- Rubrics will be dynamically loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="batch-intro-screen" class="screen">
+            <div class="batch-intro-content">
+                <h2 id="batch-intro-title">Assessment Section</h2>
+                <p class="batch-intro-description">You will be assessed on the following competency category and its detailed skills:</p>
+                <div id="batch-competencies-list" class="batch-competencies-list">
+                    <!-- Competencies for this section will be shown here -->
+                </div>
+                <p class="batch-intro-note">You will answer 5 scenario-based questions. Feedback will be provided after you complete all 5 questions.</p>
+                <button id="start-batch-btn" class="btn btn-primary" style="margin-top: 30px;">Start Questions</button>
+            </div>
+        </div>
+
+        <div id="assessment-screen" class="screen">
+            <div class="role-header">
+                <h3 id="selected-role-name">Role Assessment</h3>
+            </div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div class="question-counter">
+                Section <span id="current-batch-number">1</span> of <span id="total-batches">1</span>
+            </div>
+            
+            <div id="question-container" class="question-container">
+                <!-- Questions will be dynamically inserted here -->
+            </div>
+
+            <div class="navigation-buttons">
+                <button id="prev-btn" class="btn btn-secondary" disabled>Previous</button>
+                <button id="next-btn" class="btn btn-primary">Next</button>
+                <button id="submit-batch-btn" class="btn btn-success" style="display: none;">Complete Section</button>
+            </div>
+        </div>
+
+        <div id="batch-feedback-screen" class="screen">
+            <div class="batch-feedback-content">
+                <h2>Section Feedback</h2>
+                <div id="batch-feedback-summary" class="batch-feedback-summary">
+                    <!-- Section feedback will be shown here -->
+                </div>
+                <button id="next-batch-btn" class="btn btn-primary" style="margin-top: 30px;">Continue to Next Section</button>
+                <button id="view-final-results-btn" class="btn btn-success" style="margin-top: 15px; display: none;">View Final Results</button>
+            </div>
+        </div>
+
+        <div id="results-screen" class="screen">
+            <div class="results-content">
+                <h2>Assessment Results</h2>
+                <div id="results-role-info" class="results-role-info"></div>
+                <div id="results-summary" class="results-summary"></div>
+                <div id="results-details" class="results-details"></div>
+                <button id="restart-btn" class="btn btn-primary">Take Assessment Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+

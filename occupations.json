@@ -1,0 +1,42 @@
+[
+    {
+        "code": "29-1141.00",
+        "title": "Registered Nurses",
+        "onet_soc_code": "29-1141.00"
+    },
+    {
+        "code": "29-1171.00",
+        "title": "Nurse Practitioners",
+        "onet_soc_code": "29-1171.00"
+    },
+    {
+        "code": "29-2061.00",
+        "title": "Licensed Practical and Licensed Vocational Nurses",
+        "onet_soc_code": "29-2061.00"
+    },
+    {
+        "code": "29-1122.00",
+        "title": "Physical Therapists",
+        "onet_soc_code": "29-1122.00"
+    },
+    {
+        "code": "29-1126.00",
+        "title": "Respiratory Therapists",
+        "onet_soc_code": "29-1126.00"
+    },
+    {
+        "code": "29-1061.00",
+        "title": "Anesthesiologists",
+        "onet_soc_code": "29-1061.00"
+    },
+    {
+        "code": "29-2051.00",
+        "title": "Dietetic Technicians",
+        "onet_soc_code": "29-2051.00"
+    },
+    {
+        "code": "11-9111.00",
+        "title": "Medical and Health Services Managers",
+        "onet_soc_code": "11-9111.00"
+    }
+]

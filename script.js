@@ -32,6 +32,16 @@ const AI_QUESTION_GENERATION_ENABLED = true; // Set to true to enable AI questio
 const OPENAI_API_KEY = (typeof LOCAL_OPENAI_API_KEY !== 'undefined' && LOCAL_OPENAI_API_KEY) 
     ? LOCAL_OPENAI_API_KEY 
     : ''; // Add your OpenAI API key here, or use config.local.js (recommended)
+
+// Debug: Log API key status (first 10 chars only for security)
+if (OPENAI_API_KEY) {
+    console.log('✅ OpenAI API key loaded:', OPENAI_API_KEY.substring(0, 10) + '...');
+    console.log('✅ AI Question Generation:', AI_QUESTION_GENERATION_ENABLED ? 'ENABLED' : 'DISABLED');
+    console.log('✅ AI Evaluation:', AI_EVALUATION_ENABLED ? 'ENABLED' : 'DISABLED');
+} else {
+    console.warn('⚠️ OpenAI API key not found. Check config.local.js or set OPENAI_API_KEY in script.js');
+}
+
 const OPENAI_MODEL = 'gpt-4o-mini'; // Use 'gpt-4o-mini' for cost-effective evaluation or 'gpt-4' for more accurate
 
 // DOM Elements
@@ -2638,11 +2648,20 @@ function generateQuestionsFromSkills(skills, occupation) {
     return generatedQuestions;
 }
 
+// Helper function to sleep/delay
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Generate questions using AI when sections need more questions
-async function generateAIQuestions(category, categoryCompetencies, count, occupation) {
+// Includes retry logic with exponential backoff for rate limits
+async function generateAIQuestions(category, categoryCompetencies, count, occupation, retryCount = 0) {
     if (!AI_QUESTION_GENERATION_ENABLED || !OPENAI_API_KEY) {
         return null;
     }
+    
+    const maxRetries = 3;
+    const baseDelay = 2000; // Start with 2 seconds
     
     try {
         const apiKey = OPENAI_API_KEY;
@@ -2707,6 +2726,20 @@ Return ONLY the JSON array, no other text.`;
             })
         });
 
+        // Handle rate limiting (429) with retry
+        if (response.status === 429) {
+            if (retryCount < maxRetries) {
+                const retryAfter = response.headers.get('Retry-After');
+                const delay = retryAfter ? parseInt(retryAfter) * 1000 : baseDelay * Math.pow(2, retryCount);
+                
+                console.log(`⏳ Rate limit hit (429). Retrying in ${delay/1000} seconds... (attempt ${retryCount + 1}/${maxRetries})`);
+                await sleep(delay);
+                return generateAIQuestions(category, categoryCompetencies, count, occupation, retryCount + 1);
+            } else {
+                throw new Error(`OpenAI API rate limit exceeded. Please wait a moment and try again. (Status: 429)`);
+            }
+        }
+
         if (!response.ok) {
             throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
         }
@@ -2737,6 +2770,10 @@ Return ONLY the JSON array, no other text.`;
             onetSkills: null
         }));
     } catch (error) {
+        // If it's a rate limit error and we haven't exhausted retries, let it propagate for retry
+        if (error.message.includes('429') && retryCount < maxRetries) {
+            throw error;
+        }
         console.error('Error generating AI questions:', error);
         return null;
     }
@@ -3086,6 +3123,16 @@ async function organizeQuestionsIntoBatches() {
             if (AI_QUESTION_GENERATION_ENABLED && OPENAI_API_KEY) {
                 try {
                     console.log(`🤖 Generating ${stillNeeded} AI question(s) for category "${category}"`);
+                    
+                    // Add a delay between requests to avoid rate limits
+                    // Longer delay for later categories to prevent hitting rate limits
+                    const categoryIndex = categoriesWithBoth.indexOf(category);
+                    if (categoryIndex > 0) {
+                        const delay = 3000 + (categoryIndex * 2000); // 3s, 5s, 7s, 9s... delays
+                        console.log(`⏸️ Waiting ${delay/1000}s before generating questions for category "${category}" to avoid rate limits...`);
+                        await sleep(delay);
+                    }
+                    
                     const aiQuestions = await generateAIQuestions(category, categoryCompetencies, stillNeeded, selectedOccupation || { title: 'Professional' });
                     if (aiQuestions && aiQuestions.length > 0) {
                         // Assign IDs to new questions
@@ -3101,7 +3148,12 @@ async function organizeQuestionsIntoBatches() {
                         throw new Error('AI generation returned no questions');
                     }
                 } catch (error) {
-                    console.warn(`⚠️ AI question generation failed for category "${category}", falling back to other categories:`, error);
+                    // Check if it's a rate limit error
+                    if (error.message && error.message.includes('rate limit')) {
+                        console.warn(`⚠️ Rate limit exceeded for category "${category}". Falling back to other categories. Please wait before trying again.`);
+                    } else {
+                        console.warn(`⚠️ AI question generation failed for category "${category}", falling back to other categories:`, error);
+                    }
                     // Fall through to pulling from other categories
                     const unusedQuestions = allQuestions.filter(q => !usedQuestionIds.has(q.id));
                     if (unusedQuestions.length > 0) {

@@ -116,22 +116,36 @@ backToRolesBtn.addEventListener('click', () => {
 startAssessmentBtn.addEventListener('click', async () => {
     console.log('Start Assessment button clicked');
     console.log('Questions available:', questions.length);
+    console.log('Questions:', questions);
     
     if (!questions || questions.length === 0) {
+        console.error('No questions available!');
         alert('Error: No questions available. Please go back and select a role again.');
         return;
     }
     
     competenciesScreen.classList.remove('active');
-    await organizeQuestionsIntoBatches();
     
-    if (questionBatches.length === 0) {
-        alert('Error: Could not organize questions. Please try again.');
+    try {
+        console.log('Organizing questions into batches...');
+        await organizeQuestionsIntoBatches();
+        console.log('Batches created:', questionBatches.length);
+        console.log('Batch details:', questionBatches.map(b => ({ category: b.category, questionCount: b.questions.length })));
+        
+        if (questionBatches.length === 0) {
+            console.error('No batches created!');
+            alert('Error: Could not organize questions. Please try again.');
+            competenciesScreen.classList.add('active');
+            return;
+        }
+        
+        console.log('Showing batch intro for batch 0');
+        showBatchIntro(0);
+    } catch (error) {
+        console.error('Error organizing questions:', error);
+        alert('Error organizing questions: ' + error.message);
         competenciesScreen.classList.add('active');
-        return;
     }
-    
-    showBatchIntro(0);
 });
 
 if (startBatchBtn) {
@@ -3250,8 +3264,12 @@ async function organizeQuestionsIntoBatches() {
 
 // Show batch intro screen
 function showBatchIntro(batchIndex) {
+    console.log('showBatchIntro called with batchIndex:', batchIndex);
+    console.log('questionBatches.length:', questionBatches.length);
+    
     if (batchIndex >= questionBatches.length) {
         // All batches complete
+        console.log('All batches complete, showing results');
         calculateScores();
         batchFeedbackScreen.classList.remove('active');
         resultsScreen.classList.add('active');
@@ -3260,7 +3278,22 @@ function showBatchIntro(batchIndex) {
     }
     
     const batch = questionBatches[batchIndex];
+    console.log('Batch data:', batch);
+    console.log('Batch questions:', batch.questions?.length || 0);
+    
+    if (!batch || !batch.questions || batch.questions.length === 0) {
+        console.error('Batch is empty or has no questions!', batch);
+        alert('Error: This section has no questions. Please try again.');
+        return;
+    }
+    
     currentBatchIndex = batchIndex;
+    
+    // Hide other screens
+    competenciesScreen.classList.remove('active');
+    assessmentScreen.classList.remove('active');
+    batchFeedbackScreen.classList.remove('active');
+    resultsScreen.classList.remove('active');
     
     batchIntroTitle.textContent = `Section ${batchIndex + 1} of ${questionBatches.length}: ${batch.categoryDisplay || batch.category || 'Assessment'}`;
     batchCompetenciesList.innerHTML = '';
@@ -3326,7 +3359,9 @@ function showBatchIntro(batchIndex) {
     
     batchCompetenciesList.appendChild(categoryHeader);
     
+    console.log('Showing batch intro screen');
     batchIntroScreen.classList.add('active');
+    console.log('batchIntroScreen.classList:', batchIntroScreen.classList.toString());
 }
 
 // Start answering questions in a batch - show all questions at once

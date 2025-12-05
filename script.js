@@ -52,6 +52,8 @@ const batchIntroScreen = document.getElementById('batch-intro-screen');
 const assessmentScreen = document.getElementById('assessment-screen');
 const batchFeedbackScreen = document.getElementById('batch-feedback-screen');
 const resultsScreen = document.getElementById('results-screen');
+const loadingQuestionsScreen = document.getElementById('loading-questions-screen');
+const loadingStatus = document.getElementById('loading-status');
 
 // Verify competencies screen exists
 if (!competenciesScreen) {
@@ -126,11 +128,24 @@ startAssessmentBtn.addEventListener('click', async () => {
     
     competenciesScreen.classList.remove('active');
     
+    // Show loading screen
+    if (loadingQuestionsScreen) {
+        loadingQuestionsScreen.classList.add('active');
+        if (loadingStatus) {
+            loadingStatus.textContent = 'Organizing questions into sections...';
+        }
+    }
+    
     try {
         console.log('Organizing questions into batches...');
         await organizeQuestionsIntoBatches();
         console.log('Batches created:', questionBatches.length);
         console.log('Batch details:', questionBatches.map(b => ({ category: b.category, questionCount: b.questions.length })));
+        
+        // Hide loading screen
+        if (loadingQuestionsScreen) {
+            loadingQuestionsScreen.classList.remove('active');
+        }
         
         if (questionBatches.length === 0) {
             console.error('No batches created!');
@@ -143,6 +158,10 @@ startAssessmentBtn.addEventListener('click', async () => {
         showBatchIntro(0);
     } catch (error) {
         console.error('Error organizing questions:', error);
+        // Hide loading screen on error
+        if (loadingQuestionsScreen) {
+            loadingQuestionsScreen.classList.remove('active');
+        }
         alert('Error organizing questions: ' + error.message);
         competenciesScreen.classList.add('active');
     }
@@ -237,6 +256,20 @@ if (restartBtn) {
 
 // Load occupations from local file
 async function loadOccupations() {
+    const initialLoading = document.getElementById('initial-loading');
+    const welcomeMainContent = document.getElementById('welcome-main-content');
+    
+    // Loading indicator should already be visible from HTML
+    // Ensure it's shown and welcome content is hidden
+    if (initialLoading && welcomeMainContent) {
+        initialLoading.style.display = 'flex';
+        welcomeMainContent.style.display = 'none';
+    }
+    
+    // Add a small delay to ensure loading screen is visible (minimum 500ms)
+    const startTime = Date.now();
+    const minDisplayTime = 500;
+    
     try {
         const response = await fetch('occupations.json');
         if (!response.ok) {
@@ -250,6 +283,18 @@ async function loadOccupations() {
         // Use fallback occupations
         occupations = getFallbackOccupations();
         displayRoles(occupations);
+    } finally {
+        // Ensure loading screen shows for minimum time
+        const elapsed = Date.now() - startTime;
+        const remainingTime = Math.max(0, minDisplayTime - elapsed);
+        
+        setTimeout(() => {
+            // Hide loading indicator and show welcome content
+            if (initialLoading && welcomeMainContent) {
+                initialLoading.style.display = 'none';
+                welcomeMainContent.style.display = 'block';
+            }
+        }, remainingTime);
     }
 }
 
@@ -1625,100 +1670,88 @@ function displayRubricsForAllCompetencies() {
             const rubricLevelsDiv = document.createElement('div');
             rubricLevelsDiv.className = 'competency-rubric-levels-detailed';
             
-            // Level 3: Competent
+            // Level 3: Doing Excellent Work
             const level3Div = document.createElement('div');
             level3Div.className = 'competency-rubric-level';
             level3Div.innerHTML = `
                 <div class="rubric-level-header-detailed rubric-level-3">
-                    <strong>Level 3: Competent</strong>
+                    <strong>Level 3: Doing Excellent Work</strong>
                 </div>
                 <p class="rubric-level-desc-detailed">${RUBRIC_LEVELS[3].description}</p>
                 ${competencyRubric[3].indicators.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Key Indicators:</strong>
-                        <ul class="rubric-indicators-detailed">
-                            ${competencyRubric[3].indicators.map(ind => `<li>${ind}</li>`).join('')}
-                        </ul>
+                        <p class="rubric-indicators-narrative">${formatAsSentences(competencyRubric[3].indicators)}</p>
                     </div>
                 ` : ''}
                 ${competencyRubric[3].examples.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Examples:</strong>
-                        <ul class="rubric-examples-detailed">
-                            ${competencyRubric[3].examples.map(ex => `<li>${ex}</li>`).join('')}
-                        </ul>
+                        <p class="rubric-examples-narrative">${formatAsSentences(competencyRubric[3].examples)}</p>
                     </div>
                 ` : ''}
                 ${competencyRubric[3].recommendations.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Recommendations for Growth:</strong>
-                        <p class="rubric-recommendations-narrative">${competencyRubric[3].recommendations.join(' ')}</p>
+                        <p class="rubric-recommendations-narrative">${formatAsSentences(competencyRubric[3].recommendations)}</p>
                     </div>
                 ` : ''}
             `;
             rubricLevelsDiv.appendChild(level3Div);
             
-            // Level 2: Approaching Competency
+            // Level 2: Making Great Progress
             const level2Div = document.createElement('div');
             level2Div.className = 'competency-rubric-level';
             level2Div.innerHTML = `
                 <div class="rubric-level-header-detailed rubric-level-2">
-                    <strong>Level 2: Approaching Competency</strong>
+                    <strong>Level 2: Making Great Progress</strong>
                 </div>
                 <p class="rubric-level-desc-detailed">${RUBRIC_LEVELS[2].description}</p>
                 ${competencyRubric[2].indicators.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Key Indicators:</strong>
-                        <ul class="rubric-indicators-detailed">
-                            ${competencyRubric[2].indicators.map(ind => `<li>${ind}</li>`).join('')}
-                        </ul>
+                        <p class="rubric-indicators-narrative">${formatAsSentences(competencyRubric[2].indicators)}</p>
                     </div>
                 ` : ''}
                 ${competencyRubric[2].examples.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Examples:</strong>
-                        <ul class="rubric-examples-detailed">
-                            ${competencyRubric[2].examples.map(ex => `<li>${ex}</li>`).join('')}
-                        </ul>
+                        <p class="rubric-examples-narrative">${formatAsSentences(competencyRubric[2].examples)}</p>
                     </div>
                 ` : ''}
                 ${competencyRubric[2].recommendations.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Recommendations for Growth:</strong>
-                        <p class="rubric-recommendations-narrative">${competencyRubric[2].recommendations.join(' ')}</p>
+                        <p class="rubric-recommendations-narrative">${formatAsSentences(competencyRubric[2].recommendations)}</p>
                     </div>
                 ` : ''}
             `;
             rubricLevelsDiv.appendChild(level2Div);
             
-            // Level 1: Not Competent
+            // Level 1: Building Your Foundation
             const level1Div = document.createElement('div');
             level1Div.className = 'competency-rubric-level';
             level1Div.innerHTML = `
                 <div class="rubric-level-header-detailed rubric-level-1">
-                    <strong>Level 1: Not Competent</strong>
+                    <strong>Level 1: Building Your Foundation</strong>
                 </div>
                 <p class="rubric-level-desc-detailed">${RUBRIC_LEVELS[1].description}</p>
                 ${competencyRubric[1].indicators.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Key Indicators:</strong>
-                        <ul class="rubric-indicators-detailed">
-                            ${competencyRubric[1].indicators.map(ind => `<li>${ind}</li>`).join('')}
-                        </ul>
+                        <p class="rubric-indicators-narrative">${formatAsSentences(competencyRubric[1].indicators)}</p>
                     </div>
                 ` : ''}
                 ${competencyRubric[1].examples.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Examples:</strong>
-                        <ul class="rubric-examples-detailed">
-                            ${competencyRubric[1].examples.map(ex => `<li>${ex}</li>`).join('')}
-                        </ul>
+                        <p class="rubric-examples-narrative">${formatAsSentences(competencyRubric[1].examples)}</p>
                     </div>
                 ` : ''}
                 ${competencyRubric[1].recommendations.length > 0 ? `
                     <div class="rubric-details-section">
                         <strong>Recommendations for Growth:</strong>
-                        <p class="rubric-recommendations-narrative">${competencyRubric[1].recommendations.join(' ')}</p>
+                        <p class="rubric-recommendations-narrative">${formatAsSentences(competencyRubric[1].recommendations)}</p>
                     </div>
                 ` : ''}
             `;
@@ -2375,109 +2408,126 @@ const QUESTION_TYPE_CONFIG = {
     responseType: 'open-ended'  // 'open-ended' or 'multiple-choice'
 };
 
+// Helper function to format array items as proper sentences
+function formatAsSentences(items) {
+    if (!items || items.length === 0) return '';
+    
+    // Capitalize first letter of first item, add periods to all items, join with spaces
+    return items.map((item, index) => {
+        // Remove any trailing punctuation
+        let sentence = item.trim().replace(/[.,;:]$/, '');
+        // Capitalize first letter if it's the first item
+        if (index === 0) {
+            sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+        }
+        // Add period at the end
+        return sentence + '.';
+    }).join(' ');
+}
+
 // Expanded rubric configuration for scenario-based questions - 3-level competency system
 const RUBRIC_LEVELS = {
     1: {
         score: 1,
-        label: "Not Competent",
-        description: "Response shows limited understanding, inappropriate approach, or missing essential competencies",
-        feedback: "This response does not meet competency standards. Focus on building foundational knowledge and skills.",
+        label: "Building Your Foundation",
+        description: "You're still building your foundation here. Your response shows you're learning, but you need more support to develop the essential competencies.",
+        feedback: "I can see you're still building your foundation in this area. Don't worry - everyone starts somewhere! Let's focus on developing your core knowledge and skills together.",
         indicators: [
-            "Minimal or no recognition of key issues",
-            "Lacks understanding of professional responsibilities",
-            "No evidence of critical thinking or problem-solving",
-            "Passive approach - waiting for direction from others",
-            "Missing essential safety considerations",
-            "No consideration of patient/family needs",
-            "Inadequate or no documentation mentioned",
-            "Does not demonstrate required professional competencies"
+            "You're not yet recognizing the key issues in situations",
+            "You're still learning what your professional responsibilities are",
+            "You haven't developed your critical thinking skills yet",
+            "You tend to wait for others to tell you what to do",
+            "You're missing some important safety considerations",
+            "You're not yet considering patient and family needs",
+            "You haven't developed strong documentation habits yet",
+            "You're still building the core competencies needed for this role"
         ],
         examples: [
-            "Would wait for supervisor/physician to handle everything",
-            "Does not identify potential risks or complications",
-            "No mention of assessment or monitoring",
-            "Ignores family concerns or patient distress",
-            "Fails to recognize critical situations requiring immediate action"
+            "You might wait for your supervisor or physician to handle everything",
+            "You're not yet spotting potential risks or complications",
+            "You haven't learned to assess or monitor situations yet",
+            "You might miss family concerns or patient distress",
+            "You're not yet recognizing when situations need immediate action"
         ],
         recommendations: [
-            "Review professional scope of practice and responsibilities",
-            "Study evidence-based practice guidelines and standards",
-            "Practice identifying key issues in case scenarios",
-            "Learn to recognize safety concerns and red flags",
-            "Develop basic assessment and documentation skills",
-            "Seek mentorship and ask questions when uncertain",
-            "Complete additional training in core competencies"
+            "Take time to review your professional scope and responsibilities - understanding this will give you confidence",
+            "Dive into evidence-based practice guidelines - they'll be your roadmap",
+            "Practice identifying key issues in different scenarios - start simple and work your way up",
+            "Learn to spot safety concerns and red flags - this will become second nature with practice",
+            "Build your assessment and documentation skills step by step - you'll get there",
+            "Find a mentor and don't be afraid to ask questions - everyone needs support",
+            "Consider additional training in core competencies - investing in yourself is always worth it"
         ],
-        nextSteps: "Focus on building foundational knowledge and understanding of professional responsibilities. Practice identifying key issues in scenarios before taking action. Consider additional training or mentorship."
+        nextSteps: "Let's start by building your foundational knowledge together. Take time to understand your professional responsibilities, and practice spotting key issues in different scenarios. Don't hesitate to seek out additional training or find a mentor who can guide you - asking for help is a sign of strength, not weakness."
     },
     2: {
         score: 2,
-        label: "Approaching Competency",
-        description: "Response shows developing understanding and some competency, but needs improvement to fully meet standards",
-        feedback: "You're making progress toward competency. Continue developing your skills to fully meet professional standards.",
+        label: "Making Great Progress",
+        description: "You're making real progress! You're developing your understanding and showing competency in some areas, but there's still room to grow to fully meet the standards.",
+        feedback: "You're on the right track! I can see you're making real progress. Keep building on what you know, and you'll get there. You've got this!",
         indicators: [
-            "Identifies some key issues but may miss important concerns",
-            "Shows basic understanding of responsibilities",
-            "Limited critical thinking - follows protocols but lacks analysis",
-            "Seeks guidance appropriately but may be overly dependent",
-            "Basic safety awareness but may miss subtle risks",
-            "Some consideration of patient/family needs",
-            "Mentions documentation but lacks detail or completeness",
-            "Demonstrates some competencies but inconsistently"
+            "You're identifying some key issues, but you might be missing some important concerns",
+            "You have a basic understanding of your responsibilities, which is great progress",
+            "You're following protocols well, but you could develop deeper analytical thinking",
+            "You're good at seeking guidance when needed, though you might be able to work more independently",
+            "You have basic safety awareness, but subtle risks might still slip by",
+            "You're starting to consider patient and family needs, which shows growth",
+            "You're documenting, but you could add more detail and completeness",
+            "You're showing competency in some areas, but it's not quite consistent yet"
         ],
         examples: [
-            "Would inform supervisor and follow their direction",
-            "Identifies obvious concerns but misses underlying issues",
-            "Performs basic assessment but lacks depth",
-            "Communicates with family but may not address all concerns",
-            "Follows protocols but struggles with complex situations"
+            "You'd inform your supervisor and follow their direction - good collaboration",
+            "You're spotting obvious concerns, but the underlying issues might still escape you",
+            "You're doing basic assessments, but you could go deeper",
+            "You're communicating with families, though you might not catch all their concerns yet",
+            "You handle protocols well, but complex situations can still be challenging"
         ],
         recommendations: [
-            "Develop deeper analytical thinking skills",
-            "Practice comprehensive assessment techniques",
-            "Learn to recognize patterns and connections between issues",
-            "Build confidence in independent decision-making within scope",
-            "Improve communication skills for complex situations",
-            "Study case studies to see comprehensive approaches",
-            "Practice prioritizing multiple concerns",
-            "Focus on consistency in applying competencies"
+            "Push yourself to think more deeply and analytically - you're ready for this",
+            "Practice doing more comprehensive assessments - you have the foundation, now go deeper",
+            "Start looking for patterns and connections between issues - this will help everything click",
+            "Build your confidence in making independent decisions - you know more than you think",
+            "Work on your communication skills, especially in complex situations - practice makes perfect",
+            "Study case studies to see how others handle things comprehensively - learn from the best",
+            "Practice juggling multiple concerns and prioritizing - this skill will serve you well",
+            "Focus on being consistent in applying your competencies - reliability builds trust"
         ],
-        nextSteps: "Continue building your knowledge base and practice applying it in more complex scenarios. Focus on developing comprehensive thinking and consistent application of competencies."
+        nextSteps: "You're doing great! Keep building your knowledge and challenge yourself with more complex scenarios. As you practice, you'll find your thinking becomes more comprehensive and your skills become more consistent. Trust the process - you're growing every day."
     },
     3: {
         score: 3,
-        label: "Competent",
-        description: "Response demonstrates appropriate approach, good understanding, sound professional judgment, and meets competency standards",
-        feedback: "Excellent response! You demonstrate competency in this area. Continue to refine and maintain your skills.",
+        label: "Doing Excellent Work",
+        description: "You're doing excellent work! Your response shows you have the right approach, solid understanding, and sound professional judgment. You're meeting competency standards - keep it up!",
+        feedback: "Wow, this is really strong work! You've clearly mastered this area. Keep up the great work and continue refining your skills - you're doing amazing!",
         indicators: [
-            "Identifies key issues and concerns appropriately",
-            "Demonstrates good understanding of professional scope",
-            "Shows evidence of critical thinking and analysis",
-            "Takes appropriate independent action within scope",
-            "Good safety awareness and risk identification",
-            "Addresses patient/family needs appropriately",
-            "Comprehensive documentation mentioned",
-            "Coordinates with team members effectively",
-            "Consistently demonstrates required competencies",
-            "Shows professional judgment and decision-making"
+            "You're identifying key issues and concerns like a pro",
+            "You have a solid understanding of your professional scope - well done",
+            "You're showing strong critical thinking and analysis - this is impressive",
+            "You're taking appropriate independent action confidently",
+            "Your safety awareness and risk identification skills are on point",
+            "You're addressing patient and family needs thoughtfully and appropriately",
+            "You're doing comprehensive documentation - this shows professionalism",
+            "You're coordinating with your team effectively - great teamwork",
+            "You're consistently demonstrating the competencies needed - reliability at its finest",
+            "You're showing excellent professional judgment and decision-making"
         ],
         examples: [
-            "Performs thorough assessment, identifies concerns, implements appropriate interventions, and communicates with team",
-            "Recognizes potential complications and takes preventive measures",
-            "Balances multiple priorities effectively",
-            "Provides clear explanations to patients/families",
-            "Demonstrates consistent competency across situations"
+            "You're performing thorough assessments, identifying concerns, implementing interventions, and communicating with your team seamlessly",
+            "You're recognizing potential complications and taking preventive measures proactively",
+            "You're balancing multiple priorities effectively - this is a valuable skill",
+            "You're providing clear explanations to patients and families - they appreciate this",
+            "You're demonstrating consistent competency across different situations - you're reliable"
         ],
         recommendations: [
-            "Continue staying current with evidence-based practice",
-            "Practice maintaining consistency in complex situations",
-            "Consider mentoring others to reinforce your own learning",
-            "Engage in continuous professional development",
-            "Participate in quality improvement initiatives",
-            "Share knowledge and best practices with colleagues",
-            "Seek opportunities to expand your expertise"
+            "Keep staying current with evidence-based practice - you're setting a great example",
+            "Continue practicing maintaining your consistency, especially in complex situations - you've got this",
+            "Consider mentoring others - teaching will deepen your own understanding and help others grow",
+            "Keep engaging in professional development - your commitment to growth is admirable",
+            "Get involved in quality improvement initiatives - your skills can make a real difference",
+            "Share your knowledge and best practices with colleagues - collaboration makes everyone better",
+            "Look for opportunities to expand your expertise - you're ready to take on new challenges"
         ],
-        nextSteps: "You demonstrate competency in this area. Continue to maintain and refine your skills through ongoing practice and professional development."
+        nextSteps: "You've really got this down! You're demonstrating strong competency here. Keep maintaining and refining your skills - you're doing fantastic work. Consider sharing what you've learned with others, as teaching is one of the best ways to deepen your own understanding."
     }
 };
 
@@ -2901,6 +2951,13 @@ function mapQuestionToDetailedSkill(question, categoryCompetencies) {
     return bestMatch && bestMatchScore >= 3 ? bestMatch : null;
 }
 
+// Helper function to update loading status
+function updateLoadingStatus(message) {
+    if (loadingStatus) {
+        loadingStatus.textContent = message;
+    }
+}
+
 // Organize questions into sections, one per competency category
 // Each section ensures at least one question per detailed skill in that category
 async function organizeQuestionsIntoBatches() {
@@ -2911,6 +2968,8 @@ async function organizeQuestionsIntoBatches() {
         alert('Error: No questions were generated. Please try selecting a different role.');
         return;
     }
+    
+    updateLoadingStatus('Analyzing questions and competencies...');
     
     if (!representativeCompetencies || representativeCompetencies.length === 0) {
         console.error('No representative competencies available!');
@@ -3189,6 +3248,9 @@ async function organizeQuestionsIntoBatches() {
             }
         }
         
+        // Update status when processing each section
+        updateLoadingStatus(`Organizing section ${questionBatches.length + 1} of ${categoriesWithBoth.length}...`);
+        
         // Create section for this category only if we have at least 3 questions
         if (sectionQuestions.length >= 3) {
             // Get the list of detailed skills covered in this section
@@ -3260,6 +3322,8 @@ async function organizeQuestionsIntoBatches() {
         console.log(`Section ${idx + 1}: "${section.category}" - ${section.questions.length} questions covering ${section.competencies.length} detailed skills`);
         console.log(`  Detailed skills: ${section.competencies.join(', ')}`);
     });
+    
+    updateLoadingStatus('Finalizing assessment setup...');
 }
 
 // Show batch intro screen
@@ -3522,7 +3586,10 @@ function showBatchFeedback() {
         
         const feedbackText = document.createElement('div');
         feedbackText.className = 'feedback-text';
-        feedbackText.textContent = evaluation ? evaluation.feedback : RUBRIC_LEVELS[score].feedback;
+        // Always use current conversational feedback from RUBRIC_LEVELS
+        const currentFeedback = RUBRIC_LEVELS[score].feedback;
+        console.log(`Using feedback for score ${score}:`, currentFeedback);
+        feedbackText.textContent = currentFeedback;
         questionFeedbackDiv.appendChild(feedbackText);
         
         if (question.rubric && question.rubric[score]) {
@@ -3537,39 +3604,45 @@ function showBatchFeedback() {
         const expandedRubric = document.createElement('div');
         expandedRubric.className = 'expanded-rubric-details';
         
-        // Key Indicators
+        // Key Indicators (narrative format)
         if (rubricLevel.indicators && rubricLevel.indicators.length > 0) {
             const indicatorsDiv = document.createElement('div');
             indicatorsDiv.className = 'rubric-section';
             const indicatorsTitle = document.createElement('strong');
             indicatorsTitle.textContent = 'Key Indicators of This Level:';
             indicatorsDiv.appendChild(indicatorsTitle);
-            const indicatorsList = document.createElement('ul');
-            indicatorsList.className = 'rubric-list';
-            rubricLevel.indicators.forEach(indicator => {
-                const li = document.createElement('li');
-                li.textContent = indicator;
-                indicatorsList.appendChild(li);
-            });
-            indicatorsDiv.appendChild(indicatorsList);
+            const indicatorsNarrative = document.createElement('p');
+            indicatorsNarrative.className = 'rubric-indicators-narrative';
+            indicatorsNarrative.textContent = formatAsSentences(rubricLevel.indicators);
+            indicatorsDiv.appendChild(indicatorsNarrative);
             expandedRubric.appendChild(indicatorsDiv);
         }
         
-        // Recommendations
+        // Examples (narrative format)
+        if (rubricLevel.examples && rubricLevel.examples.length > 0) {
+            const examplesDiv = document.createElement('div');
+            examplesDiv.className = 'rubric-section';
+            const examplesTitle = document.createElement('strong');
+            examplesTitle.textContent = 'Examples:';
+            examplesDiv.appendChild(examplesTitle);
+            const examplesNarrative = document.createElement('p');
+            examplesNarrative.className = 'rubric-examples-narrative';
+            examplesNarrative.textContent = formatAsSentences(rubricLevel.examples);
+            examplesDiv.appendChild(examplesNarrative);
+            expandedRubric.appendChild(examplesDiv);
+        }
+        
+        // Recommendations (narrative format)
         if (rubricLevel.recommendations && rubricLevel.recommendations.length > 0) {
             const recommendationsDiv = document.createElement('div');
             recommendationsDiv.className = 'rubric-section';
             const recommendationsTitle = document.createElement('strong');
             recommendationsTitle.textContent = 'Recommendations for Growth:';
             recommendationsDiv.appendChild(recommendationsTitle);
-            const recommendationsList = document.createElement('ul');
-            recommendationsList.className = 'rubric-list';
-            rubricLevel.recommendations.forEach(rec => {
-                const li = document.createElement('li');
-                li.textContent = rec;
-                recommendationsList.appendChild(li);
-            });
-            recommendationsDiv.appendChild(recommendationsList);
+            const recommendationsNarrative = document.createElement('p');
+            recommendationsNarrative.className = 'rubric-recommendations-narrative';
+            recommendationsNarrative.textContent = formatAsSentences(rubricLevel.recommendations);
+            recommendationsDiv.appendChild(recommendationsNarrative);
             expandedRubric.appendChild(recommendationsDiv);
         }
         
@@ -3598,9 +3671,9 @@ function showBatchFeedback() {
 // Helper function to get level label
 function getLevelLabel(level) {
     const labels = {
-        1: 'Not Competent',
-        2: 'Approaching Competency',
-        3: 'Competent'
+        1: 'Building Your Foundation',
+        2: 'Making Great Progress',
+        3: 'Doing Excellent Work'
     };
     return labels[level] || 'Unknown';
 }
@@ -4538,12 +4611,13 @@ function showFeedback(question, rubricLevel, container = null) {
     targetContainer.appendChild(feedbackBox);
     
     // Store feedback for results (preserve existing evaluation method if available)
+    // Always use current conversational feedback from RUBRIC_LEVELS
     questionFeedback[question.id] = {
         level: rubricLevel,
         label: rubric.label,
         description: rubric.description,
         rubric: question.rubric ? question.rubric[rubricLevel] : null,
-        feedback: rubric.feedback,
+        feedback: RUBRIC_LEVELS[rubricLevel].feedback, // Always use current conversational feedback
         evaluationMethod: evaluation?.evaluationMethod || 'Keyword',
         model: evaluation?.model || ''
     };

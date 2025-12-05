@@ -15,9 +15,15 @@
 
         <div id="welcome-screen" class="screen active">
             <div class="welcome-content">
-                <h2>Welcome to the Skills Assessment</h2>
-                <p>This assessment will help you evaluate your skills based on your role. We'll use O*NET data to assess how well you perform the skills required for your occupation.</p>
-                <button id="start-btn" class="btn btn-primary">Get Started</button>
+                <div id="initial-loading" class="initial-loading">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">Loading assessment...</p>
+                </div>
+                <div id="welcome-main-content" style="display: none;">
+                    <h2>Welcome to the Skills Assessment</h2>
+                    <p>This assessment will help you evaluate your skills based on your role. We'll use O*NET data to assess how well you perform the skills required for your occupation.</p>
+                    <button id="start-btn" class="btn btn-primary">Get Started</button>
+                </div>
             </div>
         </div>
 
@@ -82,6 +88,15 @@
                         <!-- Rubrics will be dynamically loaded here -->
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="loading-questions-screen" class="screen">
+            <div class="loading-questions-content">
+                <div class="loading-spinner"></div>
+                <h2>Preparing Your Assessment</h2>
+                <p class="loading-message">We're organizing your questions and setting up the assessment. This may take a moment...</p>
+                <p class="loading-submessage" id="loading-status">Organizing questions into sections...</p>
             </div>
         </div>
 

@@ -283,19 +283,31 @@ async function loadOccupations() {
         // Use fallback occupations
         occupations = getFallbackOccupations();
         displayRoles(occupations);
-    } finally {
-        // Ensure loading screen shows for minimum time
-        const elapsed = Date.now() - startTime;
-        const remainingTime = Math.max(0, minDisplayTime - elapsed);
-        
-        setTimeout(() => {
-            // Hide loading indicator and show welcome content
-            if (initialLoading && welcomeMainContent) {
-                initialLoading.style.display = 'none';
-                welcomeMainContent.style.display = 'block';
-            }
-        }, remainingTime);
     }
+    
+    // Always hide loading screen after loading completes
+    const elapsed = Date.now() - startTime;
+    const remainingTime = Math.max(0, minDisplayTime - elapsed);
+    
+    setTimeout(() => {
+        // Hide loading indicator and show welcome content
+        const loadingEl = document.getElementById('initial-loading');
+        const contentEl = document.getElementById('welcome-main-content');
+        
+        console.log('Hiding loading screen, elements found:', { loadingEl: !!loadingEl, contentEl: !!contentEl });
+        
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        } else {
+            console.error('initial-loading element not found!');
+        }
+        
+        if (contentEl) {
+            contentEl.style.display = 'block';
+        } else {
+            console.error('welcome-main-content element not found!');
+        }
+    }, remainingTime);
 }
 
 // Fallback occupations if JSON file fails

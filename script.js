@@ -96,8 +96,13 @@ const nextBatchBtn = document.getElementById('next-batch-btn');
 const viewFinalResultsBtn = document.getElementById('view-final-results-btn');
 const batchFeedbackSummary = document.getElementById('batch-feedback-summary');
 
-// Initialize
-loadOccupations();
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadOccupations);
+} else {
+    // DOM is already ready
+    loadOccupations();
+}
 
 // Event Listeners
 startBtn.addEventListener('click', () => {
